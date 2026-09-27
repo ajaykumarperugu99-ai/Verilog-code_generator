@@ -9,11 +9,11 @@ st.set_page_config(page_title="Verilog RTL Generator", page_icon="⚡", layout="
 st.title("⚡ Verilog RTL & Testbench Generator")
 st.write("Enter a digital logic design task (e.g., `Full Adder`, `4-bit Counter`, `D Flip-Flop`) to generate Verilog RTL code and its Testbench.")
 
-# Fetch API Key from environment variable
-api_key = os.getenv("OPENROUTER_API_KEY", "")
+# Fetch API Key and aggressively strip whitespace to prevent 401 Unauthorized errors
+api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
 
 if not api_key:
-    st.warning("⚠️ OpenRouter API Key not found in environment variables. Please configure OPENROUTER_API_KEY on Render.")
+    st.warning("⚠️ OPENROUTER_API_KEY not found in environment variables. Please configure it on Render.")
 
 # User Input Box
 task_input = st.text_input("Digital Hardware Task:", placeholder="e.g., Full Adder")
@@ -26,12 +26,15 @@ if st.button("Generate Code"):
     else:
         with st.spinner("Generating Verilog RTL code and Testbench..."):
             try:
-                # Initialize Model using OpenRouter's free endpoint
-                # The api_key and base_url parameters configure ChatOpenAI for service emulators like OpenRouter.
+                # Initialize OpenRouter Model using LangChain's OpenAI client
                 llm = ChatOpenAI(
-                    model="openrouter/free",
-                    api_key=api_key, 
-                    base_url="https://openrouter.ai/api/v1" 
+                    api_key=api_key,
+                    base_url="https://openrouter.ai/api/v1",
+                    model="google/gemma-2-9b-it:free", # Explicitly requesting a free Gemma model
+                    default_headers={
+                        "HTTP-Referer": "https://verilog-generator.onrender.com", 
+                        "X-Title": "Verilog Generator"
+                    }
                 )
 
                 prompt = f"""You are an expert Verilog RTL and verification engineer.
@@ -40,7 +43,9 @@ Your task is to ONLY generate synthesizable Verilog code and a complete testbenc
 
 Provide both the module design and a self-checking testbench cleanly formatted."""
 
+                # Invoke the model
                 response = llm.invoke([HumanMessage(content=prompt)])
+                
                 st.success("Generation Complete!")
                 st.markdown(response.content)
 
